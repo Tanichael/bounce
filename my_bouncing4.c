@@ -13,7 +13,8 @@ int main(int argc, char **argv)
      .height = 40,
      .G = 1.0,
      .dt = 1.0,
-     .cor = 0.8
+     .cor = 0.8,
+     .border = 100.0
     };
 
   size_t objnum;
@@ -28,7 +29,7 @@ int main(int argc, char **argv)
   Object objects[objnum];
 
   if(argc == 1) {
-    objects[0] = (Object){ .m = 60.0, .x = 2.0, .y = -19.9, .vx = 0.0, .vy = 0.0};
+    objects[0] = (Object){ .m = 60.0, .x = 0.0, .y = -19.9, .vx = 0.0, .vy = 5.0};
     objects[1] = (Object){ .m = 100000.0, .x = 0.0, .y =  1000.0, .vx = 0.0, .vy = 0.0};
   } else if(argc == 3) {
     const size_t bufsize = 200;
@@ -78,6 +79,11 @@ int main(int argc, char **argv)
     }
   }
 
+  printf("%lf\n", objects[3].x);
+  printf("%lf\n", objects[3].y);
+  printf("%lf\n", objects[3].m);
+
+
   // シミュレーション. ループは整数で回しつつ、実数時間も更新する
   const double stop_time = 400;
   double t = 0;
@@ -96,17 +102,13 @@ int main(int argc, char **argv)
   return EXIT_SUCCESS;
 }
 
-// 実習: 以下に my_ で始まる関数を実装する
-// 最終的に phisics2.h 内の事前に用意された関数プロトタイプをコメントアウト
-
 void my_update_velocities(Object objs[], const size_t numobj, const Condition cond) {
   //地球と物体はy方向にかなり遠い距離にあるのでx方向には加速しないと考える
-  //(このシミュレーションは地球は完全に系外なので)
   for(size_t i = 0; i < numobj; i++) {
     double ax = 0.0;
     double ay = 0.0;
-
     for(size_t j = 0; j < numobj; j++) {
+      if(i == j) continue;
       double tempax;
       double tempay;
 
@@ -146,6 +148,32 @@ void my_update_positions(Object objs[], const size_t numobj, const Condition con
     objs[i].x = x;
     objs[i].y = y;
   }
+
+  for(size_t i = 0; i < numobj; i++) {
+    for(size_t j = i + 1; j < numobj; j++) {
+      double dist;
+      dist = (objs[i].x - objs[j].x) * (objs[i].x - objs[j].x) + (objs[i].y - objs[j].y) * (objs[i].y - objs[j].y);
+      if(dist < cond.border) {
+        //融合処理
+        //運動量保存処理
+        double tempvx;
+        double tempvy;
+        tempvx = (objs[i].m * objs[i].vx + objs[j].m * objs[j].vx) / (objs[i].m + objs[j].m);
+        tempvy = (objs[i].m * objs[i].vy + objs[j].m * objs[j].vy) / (objs[i].m + objs[j].m);
+
+        objs[i].vx = tempvx;
+        objs[j].vx = tempvx;
+        objs[i].vy = tempvy;
+        objs[j].vy = tempvy;
+
+        //融合させる
+        objs[j].x = objs[i].x;
+        objs[j].y = objs[i].y;
+
+      }
+    }
+  }
+  
 }
 
 void my_plot_objects(Object objs[], const size_t numobj, const double t, const Condition cond) {
@@ -165,7 +193,7 @@ void my_plot_objects(Object objs[], const size_t numobj, const double t, const C
         double y = objs[i].y + (double)(cond.height / 2);
         double ix = round(x);
         double iy = round(y);
-        if(j == iy && k == ix) {
+        if(j == iy && k == ix && f == 0) {
           printf("o");
           f = 1;
         }
@@ -218,6 +246,14 @@ void my_bounce(Object objs[], const size_t numobj, const Condition cond) {
       objs[i].vx = objs[i].vx * cond.cor * (-1);
     }
 
+    if(iy < 0) {
+      // 位置を反転させる
+      int ex = - iy;
+      int ret = (int)round(ex * cond.cor);
+      int niy = ret;
+      objs[i].y = (int)round(niy - (double)(cond.height / 2));
+      objs[i].vy = objs[i].vy * cond.cor * (-1);
+    }
     //y方向バウンド処理
     if(iy >= cond.height) {
       // バウンドの処理 どのスケールで計算すればいいのか？？

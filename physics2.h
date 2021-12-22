@@ -7,6 +7,7 @@ typedef struct condition
   double G; // 重力定数
   double dt; // シミュレーションの時間幅
   double cor; // 壁の反発係数
+  double border;
 } Condition;
 
 // 個々の物体を表す構造体
