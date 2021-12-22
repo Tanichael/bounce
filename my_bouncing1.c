@@ -15,12 +15,13 @@ int main(int argc, char **argv)
      .cor = 0.8
     };
   
-  size_t objnum = 2;
+  size_t objnum = 3;
   Object objects[objnum];
 
-  // objects[1] は巨大な物体を画面外に... 地球のようなものを想定
-  objects[0] = (Object){ .m = 60.0, .y = -19.9, .vy = 2.0};
-  objects[1] = (Object){ .m = 100000.0, .y =  1000.0, .vy = 0.0};
+  // objects[]の最後の要素 は巨大な物体を画面外に... 地球のようなものを想定
+  objects[0] = (Object){ .m = 60.0, .x = 0.0, .y = -19.9, .vx = 0.0, .vy = 0.0};
+  objects[1] = (Object){ .m = 40.0, .x = 0.0, .y =  5.0, .vx = -2.0, .vy = 3.0};
+  objects[1] = (Object){ .m = 100000.0, .x = 0.0, .y =  1000.0, .vx = 0.0, .vy = 0.0};
 
   // シミュレーション. ループは整数で回しつつ、実数時間も更新する
   const double stop_time = 400;
@@ -44,27 +45,40 @@ int main(int argc, char **argv)
 // 最終的に phisics2.h 内の事前に用意された関数プロトタイプをコメントアウト
 
 void my_update_velocities(Object objs[], const size_t numobj, const Condition cond) {
+  //地球と物体はy方向にかなり遠い距離にあるのでx方向には加速しないと考える
   for(size_t i = 0; i < numobj; i++) {
-    double a = 0.0;
+    double ax = 0.0;
+    double ay = 0.0;
     for(size_t j = 0; j < numobj; j++) {
       if(i == j) continue;
-      double temp;
-      temp = cond.G * objs[j].m / ((objs[j].y - objs[i].y) * (objs[j].y - objs[i].y));
-      if(objs[j].y - objs[i].y < 0) temp *= -1;
-      a += temp;
-    }
+      double tempay;
 
+      if(objs[j].y - objs[i].y == 0.0) {
+        tempay = 0;
+      } else {
+        tempay = cond.G * objs[j].m / ((objs[j].y - objs[i].y) * (objs[j].y - objs[i].y));
+      }
+      if(objs[j].y - objs[i].y < 0) tempay *= -1;
+      ay += tempay;
+    }
+    double vx;
     double vy;
-    vy = objs[i].vy + a * cond.dt;
+    vx = objs[i].vx + ax * cond.dt;
+    vy = objs[i].vy + ay * cond.dt;
+    objs[i].prev_vx = objs[i].vx;
     objs[i].prev_vy = objs[i].vy;
+    objs[i].vx = vx;
     objs[i].vy = vy;
   }
 }
 
 void my_update_positions(Object objs[], const size_t numobj, const Condition cond) {
+  double x;
   double y;
   for(size_t i = 0; i < numobj; i++) {
+    x = objs[i].x + objs[i].prev_vx * cond.dt;
     y = objs[i].y + objs[i].prev_vy * cond.dt;
+    objs[i].x = x;
     objs[i].y = y;
   }
 }
@@ -82,7 +96,7 @@ void my_plot_objects(Object objs[], const size_t numobj, const double t, const C
       int f = 0;
       for(size_t i = 0; i < numobj; i++) {
         //座標からTerminal上の位置に変換 (左上が(0, 0))
-        double x = (double)(cond.width / 2);
+        double x = objs[i].x + (double)(cond.width / 2);
         double y = objs[i].y + (double)(cond.height / 2);
         double ix = round(x);
         double iy = round(y);
@@ -106,6 +120,7 @@ void my_plot_objects(Object objs[], const size_t numobj, const double t, const C
 
   printf("t = %5.1lf, ", t);
   for(size_t i = 0; i < numobj; i++) {
+    printf("objs[%zu].x = %7.2lf, ", i, objs[i].x);
     printf("objs[%zu].y = %7.2lf", i, objs[i].y);
     if(i == numobj-1) {
       printf("\n");
@@ -118,10 +133,28 @@ void my_plot_objects(Object objs[], const size_t numobj, const double t, const C
 void my_bounce(Object objs[], const size_t numobj, const Condition cond) {
   for(size_t i = 0; i < numobj - 1; i++) {
     //i == numobj - 1の時は地球なのでバウンド処理はしない感じでいい？
+    int ix = (int)round(objs[i].x + (double)(cond.width / 2));
     int iy = (int)round(objs[i].y + (double)(cond.height / 2));
-    if(iy < cond.height) {
-      continue;
-    } else {
+    //x方向バウンド処理
+    if(ix < 0) {
+      // 位置を反転させる
+      int ex = - ix;
+      int ret = (int)round(ex * cond.cor);
+      int nix = ret;
+      objs[i].x = (int)round(nix - (double)(cond.width / 2));
+      objs[i].vx = objs[i].vx * cond.cor * (-1);
+    }
+    if(ix >= cond.width) {
+      // 位置を反転させる
+      int ex = ix - cond.width + 1;
+      int ret = (int)round(ex * cond.cor);
+      int nix = cond.width - ret;
+      objs[i].x = (int)round(nix - (double)(cond.width / 2));
+      objs[i].vx = objs[i].vx * cond.cor * (-1);
+    }
+
+    //y方向バウンド処理
+    if(iy >= cond.height) {
       // バウンドの処理 どのスケールで計算すればいいのか？？
       // 位置を反転させる
       int ex = iy - cond.height + 1;

@@ -13,9 +13,13 @@ typedef struct condition
 typedef struct object
 {
   double m;
+  double x;
   double y;
+  double prev_x;
   double prev_y; // 壁からの反発に使用
+  double vx;
   double vy;
+  double prev_vx;
   double prev_vy;
 } Object;
 
